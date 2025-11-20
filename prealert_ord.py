@@ -58,7 +58,6 @@ def get_no_outbound_mawb_from_db(start: str, end: str) -> pd.DataFrame:
 
     sql_ = """
     SELECT
-         SELECT
     	a.*,c.delivery_channel,
     IF
     	( a.outbound IS NULL, 'N', 'Y' ) outbound_status,
