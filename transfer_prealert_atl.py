@@ -32,38 +32,119 @@ def get_mawb(start, end):
     )
     sql_ = """
     SELECT
-        a.*, c.delivery_channel,
-        IF(a.outbound IS NULL, 'N', 'Y') outbound_status,
-        CASE a.pod_code
-            WHEN 'LAX' THEN DATE_SUB(a.ata, INTERVAL 8 HOUR)
-            WHEN 'JFK' THEN DATE_SUB(a.ata, INTERVAL 5 HOUR)
-            ELSE DATE_SUB(a.ata, INTERVAL 6 HOUR) END AS ata_local,
-        CASE a.pod_code
-            WHEN 'LAX' THEN DATE_SUB(a.full_release, INTERVAL 8 HOUR)
-            WHEN 'JFK' THEN DATE_SUB(a.full_release, INTERVAL 5 HOUR)
-            ELSE DATE_SUB(a.full_release, INTERVAL 6 HOUR) END AS full_release_local,
-        CASE a.pod_code
-            WHEN 'LAX' THEN DATE_SUB(a.cbp_release, INTERVAL 8 HOUR)
-            WHEN 'JFK' THEN DATE_SUB(a.cbp_release, INTERVAL 5 HOUR)
-            ELSE DATE_SUB(a.cbp_release, INTERVAL 6 HOUR) END AS cbp_release_local,
-        CASE a.pod_code
-            WHEN 'LAX' THEN DATE_SUB(a.pga_release, INTERVAL 8 HOUR)
-            WHEN 'JFK' THEN DATE_SUB(a.pga_release, INTERVAL 5 HOUR)
-            ELSE DATE_SUB(a.pga_release, INTERVAL 6 HOUR) END AS pga_release_local
-    FROM
-        (SELECT
-            o.id, e.mawb_no, o.customer_code, e.is_destination_transfer scf_type,
-            e.transfer_status, o.pod_code,
-            (SELECT ev.operate_date FROM tl_order_event ev WHERE ev.order_id = o.id AND ev.event_type_id = 18 AND ev.is_delete = 0 LIMIT 1) ata,
-            (SELECT ev.operate_date FROM tl_order_event ev WHERE ev.order_id = o.id AND ev.event_type_id = 10 AND ev.is_delete = 0 LIMIT 1) full_release,
-            (SELECT ev.operate_date FROM tl_order_event ev WHERE ev.order_id = o.id AND ev.event_type_id = 57 AND ev.is_delete = 0 LIMIT 1) cbp_release,
-            (SELECT ev.operate_date FROM tl_order_event ev WHERE ev.order_id = o.id AND ev.event_type_id = 59 AND ev.is_delete = 0 LIMIT 1) pga_release,
-            (SELECT ev.operate_date FROM tl_order_event ev WHERE ev.order_id = o.id AND ev.event_type_id = 16 AND ev.is_delete = 0 AND ev.remark IS NULL LIMIT 1) outbound
-        FROM tl_order o, tl_order_extra e
-        WHERE o.create_time >= %s AND o.create_time <= %s
-            AND o.is_delete = 0 AND o.id = e.order_id AND e.business_type='17' AND e.is_delete=0) a,
-        tl_customers_delivery_channel c
-    WHERE a.id = c.order_id AND c.is_delete=0;
+	a.*,
+	c.channel_info,
+IF
+	( a.outbound IS NULL, 'N', 'Y' ) outbound_status,
+CASE
+		a.pod_code 
+		WHEN 'LAX' THEN
+		DATE_SUB( a.ata, INTERVAL 8 HOUR ) 
+		WHEN 'JFK' THEN
+		DATE_SUB( a.ata, INTERVAL 5 HOUR ) ELSE DATE_SUB( a.ata, INTERVAL 6 HOUR ) 
+	END AS ata_local,
+CASE
+		a.pod_code 
+		WHEN 'LAX' THEN
+		DATE_SUB( a.full_release, INTERVAL 8 HOUR ) 
+		WHEN 'JFK' THEN
+		DATE_SUB( a.full_release, INTERVAL 5 HOUR ) ELSE DATE_SUB( a.full_release, INTERVAL 6 HOUR ) 
+	END AS full_release_local,
+CASE
+		a.pod_code 
+		WHEN 'LAX' THEN
+		DATE_SUB( a.cbp_release, INTERVAL 8 HOUR ) 
+		WHEN 'JFK' THEN
+		DATE_SUB( a.cbp_release, INTERVAL 5 HOUR ) ELSE DATE_SUB( a.cbp_release, INTERVAL 6 HOUR ) 
+	END AS cbp_release_local,
+CASE
+		a.pod_code 
+		WHEN 'LAX' THEN
+		DATE_SUB( a.pga_release, INTERVAL 8 HOUR ) 
+		WHEN 'JFK' THEN
+		DATE_SUB( a.pga_release, INTERVAL 5 HOUR ) ELSE DATE_SUB( a.pga_release, INTERVAL 6 HOUR ) 
+	END AS pga_release_local 
+FROM
+	(
+	SELECT
+		o.id,
+		e.mawb_no,
+		o.customer_code,
+		e.is_destination_transfer scf_type,
+		e.transfer_status,
+		o.pod_code,
+		(
+		SELECT
+			ev.operate_date 
+		FROM
+			tl_order_event ev 
+		WHERE
+			ev.order_id = o.id 
+			AND ev.event_type_id = 18 
+			AND ev.is_delete = 0 
+			LIMIT 1 
+		) ata,
+		(
+		SELECT
+			ev.operate_date 
+		FROM
+			tl_order_event ev 
+		WHERE
+			ev.order_id = o.id 
+			AND ev.event_type_id = 10 
+			AND ev.is_delete = 0 
+			LIMIT 1 
+		) full_release,
+		(
+		SELECT
+			ev.operate_date 
+		FROM
+			tl_order_event ev 
+		WHERE
+			ev.order_id = o.id 
+			AND ev.event_type_id = 57 
+			AND ev.is_delete = 0 
+			LIMIT 1 
+		) cbp_release,
+		(
+		SELECT
+			ev.operate_date 
+		FROM
+			tl_order_event ev 
+		WHERE
+			ev.order_id = o.id 
+			AND ev.event_type_id = 59 
+			AND ev.is_delete = 0 
+			LIMIT 1 
+		) pga_release,
+		(
+		SELECT
+			ev.operate_date 
+		FROM
+			tl_order_event ev 
+		WHERE
+			ev.order_id = o.id 
+			AND ev.event_type_id = 16 
+			AND ev.is_delete = 0 
+			AND ev.remark IS NULL 
+			LIMIT 1 
+		) outbound 
+	FROM
+		tl_order o,
+		tl_order_extra e 
+	WHERE
+		o.create_time >= '2025-11-10'
+		AND o.create_time <= '2025-11-15'
+		AND o.is_delete = 0 
+		AND o.id = e.order_id 
+		AND e.business_type = '17' 
+		AND e.is_delete = 0 
+	) a,
+	tl_order_customs c 
+WHERE
+	a.id = c.order_id 
+	AND c.is_delete = 0
+	group by c.order_id,c.channel_info;
     """
     data = pd.read_sql(sql_, conn, params=(start, end))
     conn.close()
@@ -128,7 +209,6 @@ def get_carton_container_selected(carton_list):
 def get_atl_data(start, end):
     """获取 ATL 需要预警的主单和容器数据"""
     n_mawb = get_mawb(start, end)
-    n_mawb.rename(columns={'delivery_channel': 'channel_info'}, inplace=True)
     n_mawb = n_mawb[n_mawb['customer_code'].isin(['Temu-ORD'])]
     n_mawb['weekday'] = n_mawb["ata_local"].dt.weekday + 1
 
