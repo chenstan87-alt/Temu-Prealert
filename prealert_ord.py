@@ -461,14 +461,14 @@ def get_ord_data(start: str, end: str) -> Tuple[pd.DataFrame, pd.DataFrame, dict
     # 13) select pod_code == 'ORD' (your original selected ORD? you had pod_code=='ORD' for ord_prealert)
     ord_prealert_mawb = no_outbound_mawb[no_outbound_mawb.get("pod_code") == "ORD"].copy()
 
-    # 14) compute adjusted_ddl according to daily warehouse operation (18:00 close, 09:00 open)
+    # 14) compute adjusted_ddl according to daily warehouse operation (20:00 close, 08:00 open)
     def adjust_time(t):
         if pd.isna(t):
             return pd.NaT
-        if t.hour >= 18:
-            return t.replace(hour=18, minute=0, second=0, microsecond=0)
-        elif t.hour < 9:
-            return (t - pd.Timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
+        if t.hour >= 20:
+            return t.replace(hour=20, minute=0, second=0, microsecond=0)
+        elif t.hour < 8:
+            return (t - pd.Timedelta(days=1)).replace(hour=20, minute=0, second=0, microsecond=0)
         else:
             return t
 
