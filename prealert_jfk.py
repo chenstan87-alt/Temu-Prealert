@@ -159,8 +159,8 @@ FROM
 		tl_order o,
 		tl_order_extra e 
 	WHERE
-		o.create_time >= '2025-11-10'
-		AND o.create_time <= '2025-11-15'
+		o.create_time >= %s
+		AND o.create_time <= %s
 		AND o.is_delete = 0 
 		AND o.id = e.order_id 
 		AND e.business_type = '17' 
