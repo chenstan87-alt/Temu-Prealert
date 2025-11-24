@@ -578,7 +578,7 @@ def get_data(start: str, end: str) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
 
 
 def get_transfer_data(start, end):
-    """获取 ATL 需要预警的主单和容器数据"""
+    """获取 ATL/JFK 需要预警的主单和容器数据"""
     n_mawb = get_no_outbound_mawb_from_db(start, end)
     n_mawb_ord = n_mawb[n_mawb['customer_code'].isin(['Temu-ORD'])]
     n_mawb_ord['weekday'] = n_mawb_ord["ata_local"].dt.weekday + 1
@@ -594,6 +594,9 @@ def get_transfer_data(start, end):
     n_mawb_ord["base_time"] = n_mawb_ord.apply(compute_base_time, axis=1)
     n_mawb_ord_atl = n_mawb_ord[n_mawb_ord['channel_info'].str.endswith('ATL', na=False)]
     n_mawb_ord_atl.dropna(subset=['ata'], inplace=True)
+
+    n_mawb_ord_jfk = n_mawb_ord[n_mawb_ord['channel_info'].str.endswith('JFK', na=False)]
+    n_mawb_ord_jfk.dropna(subset=['ata'], inplace=True)
 
     # 108小时工作日算法
     def add_working_hours_skip_weekends(start_time, hours):
@@ -616,9 +619,13 @@ def get_transfer_data(start, end):
 
     n_mawb_ord_atl["basetime_delivery_ddl"] = n_mawb_ord_atl['base_time'].apply(lambda r: add_working_hours_skip_weekends(r, 108))
     n_mawb_ord_atl.dropna(subset=['full_release_local'], inplace=True)
-
     # full release 周末调整
     n_mawb_ord_atl['release_weekday'] = n_mawb_ord_atl["full_release_local"].dt.weekday + 1
+
+    n_mawb_ord_jfk["basetime_delivery_ddl"] = n_mawb_ord_jfk['base_time'].apply(lambda r: add_working_hours_skip_weekends(r, 108))
+    n_mawb_ord_jfk.dropna(subset=['full_release_local'], inplace=True)
+    # full release 周末调整
+    n_mawb_ord_jfk['release_weekday'] = n_mawb_ord_jfk["full_release_local"].dt.weekday + 1
 
     def compute_release_base(row):
         a, b = row["full_release_local"], row["release_weekday"]
@@ -628,6 +635,7 @@ def get_transfer_data(start, end):
         return a
 
     n_mawb_ord_atl["release_base_time"] = n_mawb_ord_atl.apply(compute_release_base, axis=1)
+    n_mawb_ord_jfk["release_base_time"] = n_mawb_ord_jfk.apply(compute_release_base, axis=1)
 
     # 2.5 工作日差计算
     def workday_diff_decimal(start: pd.Timestamp, end: pd.Timestamp) -> float:
@@ -647,12 +655,18 @@ def get_transfer_data(start, end):
     n_mawb_ord_atl["release_diff"] = n_mawb_ord_atl.apply(lambda r: workday_diff_decimal(r['base_time'], r['release_base_time']), axis=1)
     n_mawb_ord_atl["over_2_5_bdays"] = n_mawb_ord_atl["release_diff"] > 2.5
 
+    n_mawb_ord_jfk["release_diff"] = n_mawb_ord_jfk.apply(lambda r: workday_diff_decimal(r['base_time'], r['release_base_time']), axis=1)
+    n_mawb_ord_jfk["over_2_5_bdays"] = n_mawb_ord_jfk["release_diff"] > 2.5
+
     # 真实出库ddl
     def compute_real_ddl(row):
         return row['full_release_local'] + BDay(2) if row['over_2_5_bdays'] else row['basetime_delivery_ddl']
 
     n_mawb_ord_atl['real_delivery_ddl'] = n_mawb_ord_atl.apply(compute_real_ddl, axis=1)
     mawb_ord_atl = n_mawb_ord_atl[n_mawb_ord_atl['pod_code']=='ORD']
+
+    n_mawb_ord_jfk['real_delivery_ddl'] = n_mawb_ord_jfk.apply(compute_real_ddl, axis=1)
+    mawb_ord_jfk = n_mawb_ord_jfk[n_mawb_ord_jfk['pod_code'] == 'ORD']
 
     # 仓库实际最晚出库时间
     def adjust_time(t):
@@ -664,34 +678,51 @@ def get_transfer_data(start, end):
             return t
 
     mawb_ord_atl["adjusted_ddl"] = mawb_ord_atl["real_delivery_ddl"].apply(adjust_time)
+    mawb_ord_jfk["adjusted_ddl"] = mawb_ord_jfk["real_delivery_ddl"].apply(adjust_time)
 
     # 48小时内预警
     now = pd.Timestamp.now()
     next_day_start = (now + pd.Timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     x = next_day_start + pd.Timedelta(days=2)
     mawb_ord_atl['prealert'] = mawb_ord_atl["adjusted_ddl"] < x
+    mawb_ord_jfk['prealert'] = mawb_ord_jfk["adjusted_ddl"] < x
 
     mawb_alert_ord_atl = mawb_ord_atl[mawb_ord_atl['prealert']].copy()
     mawb_alert_ord_atl = mawb_alert_ord_atl[['mawb_no', 'ata_local', 'full_release_local', 'adjusted_ddl']].drop_duplicates()
+    mawb_alert_ord_jfk = mawb_ord_jfk[mawb_ord_jfk['prealert']].copy()
+    mawb_alert_ord_jfk = mawb_alert_ord_jfk[
+        ['mawb_no', 'ata_local', 'full_release_local', 'adjusted_ddl']].drop_duplicates()
+
 
     no_outbound_carton_transfer = get_no_outbound_carton_transfer(start)
     ord_atl_overdue_carton = pd.merge(no_outbound_carton_transfer, mawb_alert_ord_atl, on="mawb_no", how="inner")
     ord_atl_overdue_carton.rename(columns={"packet_no": "bag_no", "channel": "channel_info"}, inplace=True)
+    ord_jfk_overdue_carton = pd.merge(no_outbound_carton_transfer, mawb_alert_ord_jfk, on="mawb_no", how="inner")
+    ord_jfk_overdue_carton.rename(columns={"packet_no": "bag_no", "channel": "channel_info"}, inplace=True)
 
     ord_atl_carton_list_transfer = ord_atl_overdue_carton["bag_no"].to_list()
     ord_atl_carton_container_selected = get_carton_container_selected_from_db(ord_atl_carton_list_transfer)
+    ord_jfk_carton_list_transfer = ord_jfk_overdue_carton["bag_no"].to_list()
+    ord_jfk_carton_container_selected = get_carton_container_selected_from_db(ord_jfk_carton_list_transfer)
 
     ord_atl_overdue_carton_container = pd.merge(ord_atl_overdue_carton, ord_atl_carton_container_selected, on="bag_no", how="inner")
     ord_atl_overdue_carton_container = ord_atl_overdue_carton_container[
-        ~(ord_atl_overdue_carton_container['container_no'].fillna('').astype(str).str.startswith('EPORD'))
-    ]
+        ~(ord_atl_overdue_carton_container['container_no'].fillna('').astype(str).str.startswith('EPORD'))]
+
+    ord_jfk_overdue_carton_container = pd.merge(ord_jfk_overdue_carton, ord_jfk_carton_container_selected, on="bag_no",how="inner")
+    ord_jfk_overdue_carton_container = ord_jfk_overdue_carton_container[
+        ~(ord_jfk_overdue_carton_container['container_no'].fillna('').astype(str).str.startswith('EPORD'))]
 
     # 主单预警
     ord_atl_mawb_channel = ord_atl_overdue_carton_container.drop_duplicates(subset=["adjusted_ddl", "mawb_no", "channel_info"])
     ord_atl_mawb_channel_ = ord_atl_mawb_channel[["adjusted_ddl", "mawb_no", "channel_info"]].reset_index(drop=True)
+    ord_jfk_mawb_channel = ord_jfk_overdue_carton_container.drop_duplicates(subset=["adjusted_ddl", "mawb_no", "channel_info"])
+    ord_jfk_mawb_channel_ = ord_jfk_mawb_channel[["adjusted_ddl", "mawb_no", "channel_info"]].reset_index(drop=True)
 
     # 容器预警
     ord_atl_container_channel = ord_atl_overdue_carton_container.drop_duplicates(subset=["adjusted_ddl", "container_no", "channel_info"])
     ord_atl_container_channel_ = ord_atl_container_channel[["adjusted_ddl", "container_no", "channel_info"]].reset_index(drop=True)
+    ord_jfk_container_channel = ord_jfk_overdue_carton_container.drop_duplicates(subset=["adjusted_ddl", "container_no", "channel_info"])
+    ord_jfk_container_channel_ = ord_jfk_container_channel[["adjusted_ddl", "container_no", "channel_info"]].reset_index(drop=True)
 
-    return ord_atl_mawb_channel_, ord_atl_container_channel_
+    return ord_atl_mawb_channel_, ord_atl_container_channel_,ord_jfk_mawb_channel_, ord_jfk_container_channel_
