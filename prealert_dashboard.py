@@ -10,7 +10,7 @@ end = yesterday_end.strftime("%Y-%m-%d %H:%M:%S")
 start = ten_days_ago_start.strftime("%Y-%m-%d %H:%M:%S")
 
 ord_mawb, ord_container_channel, jfk_mawb, jfk_container_channel = get_data(start, end)
-ord_atl_mawb, ord_atl_container_channel,ord_jfk_mawb, ord_jfk_container_channel = get_transfer_data(start, end)
+ord_atl_mawb, ord_atl_container_channel, ord_jfk_mawb, ord_jfk_container_channel = get_transfer_data(start, end)
 
 
 jfk_container_channel.dropna(subset=['container_no'],inplace=True)
