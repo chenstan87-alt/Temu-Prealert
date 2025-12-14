@@ -371,7 +371,26 @@ def get_data(start: str, end: str) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
         us_holiday_list = []
 
     # 6) compute customs_del = base_time + 3 business days
-    no_outbound_mawb["customs_del"] = no_outbound_mawb["base_time"] + BDay(3)
+
+    ##USPSGRR 3.5个工作日时效
+    def add_3_5_business_days(t):
+        # 先加 3 个工作日
+        if t['channel_info'] == "USPSGRR":
+            # 1️⃣ 先加 3 个工作日
+            t['base_time'] = t['base_time'] + BDay(3)
+
+            # 2️⃣ 再加 12 小时
+            dt_plus_12h = t['base_time'] + pd.Timedelta(hours=12)
+
+            # 3️⃣ 如果落在周末，顺延到下一个周一，保留时间
+            if dt_plus_12h.weekday() >= 5:  # 5=周六，6=周日
+                days_to_monday = 7 - dt_plus_12h.weekday()
+                dt_plus_12h = dt_plus_12h + pd.Timedelta(days=days_to_monday)
+            return dt_plus_12h
+        else:
+            return t['base_time'] + BDay(3)
+
+    no_outbound_mawb["customs_del"] = no_outbound_mawb.apply(add_3_5_business_days, axis=1)
     no_outbound_mawb = no_outbound_mawb.dropna(subset=["base_time", "customs_del"])
 
     # robust holiday check per row
