@@ -659,7 +659,8 @@ def get_transfer_data(start, end):
     # 2.5 工作日差计算
     def workday_diff_decimal(start: pd.Timestamp, end: pd.Timestamp) -> float:
         if pd.isna(start) or pd.isna(end):
-            return pd.NA
+            return np.nan
+           #return pd.NA
         sign = 1
         if end < start:
             start, end = end, start
