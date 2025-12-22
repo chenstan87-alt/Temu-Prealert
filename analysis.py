@@ -683,10 +683,10 @@ def get_transfer_data(start, end):
         return row['full_release_local'] + BDay(2) if row['over_2_5_bdays'] else row['basetime_delivery_ddl']
 
     n_mawb_ord_atl['real_delivery_ddl'] = n_mawb_ord_atl.apply(compute_real_ddl, axis=1)
-    mawb_ord_atl = n_mawb_ord_atl[n_mawb_ord_atl['pod_code']=='ORD']
+    mawb_ord_atl = n_mawb_ord_atl[n_mawb_ord_atl['pod_code']=='ORD'].copy()
 
     n_mawb_ord_jfk['real_delivery_ddl'] = n_mawb_ord_jfk.apply(compute_real_ddl, axis=1)
-    mawb_ord_jfk = n_mawb_ord_jfk[n_mawb_ord_jfk['pod_code'] == 'ORD']
+    mawb_ord_jfk = n_mawb_ord_jfk[n_mawb_ord_jfk['pod_code'] == 'ORD'].copy()
 
     # 仓库实际最晚出库时间
     def adjust_time(t):
