@@ -679,13 +679,39 @@ def get_transfer_data(start, end):
     n_mawb_ord_jfk["over_2_5_bdays"] = n_mawb_ord_jfk["release_diff"] > 2.5
 
     # 真实出库ddl
+    # def compute_real_ddl(row):
+    #     return row['full_release_local'] + BDay(2) if row['over_2_5_bdays'] else row['basetime_delivery_ddl']
+    #
+    # n_mawb_ord_atl['real_delivery_ddl'] = n_mawb_ord_atl.apply(compute_real_ddl, axis=1)
+    # mawb_ord_atl = n_mawb_ord_atl[n_mawb_ord_atl['pod_code']=='ORD'].copy()
+    #
+    # n_mawb_ord_jfk['real_delivery_ddl'] = n_mawb_ord_jfk.apply(compute_real_ddl, axis=1)
+    # mawb_ord_jfk = n_mawb_ord_jfk[n_mawb_ord_jfk['pod_code'] == 'ORD'].copy()
     def compute_real_ddl(row):
-        return row['full_release_local'] + BDay(2) if row['over_2_5_bdays'] else row['basetime_delivery_ddl']
+        # 增加对布尔判断列的空值检查
+        if pd.isna(row['over_2_5_bdays']):
+            return pd.NaT
 
-    n_mawb_ord_atl['real_delivery_ddl'] = n_mawb_ord_atl.apply(compute_real_ddl, axis=1)
-    mawb_ord_atl = n_mawb_ord_atl[n_mawb_ord_atl['pod_code']=='ORD'].copy()
+        if row['over_2_5_bdays']:
+            # 确保时间列不为空再加 BDay
+            if pd.isna(row['full_release_local']):
+                return pd.NaT
+            return row['full_release_local'] + BDay(2)
+        else:
+            return row['basetime_delivery_ddl']
 
-    n_mawb_ord_jfk['real_delivery_ddl'] = n_mawb_ord_jfk.apply(compute_real_ddl, axis=1)
+    # 处理 ATL
+    if not n_mawb_ord_atl.empty:
+        n_mawb_ord_atl['real_delivery_ddl'] = n_mawb_ord_atl.apply(compute_real_ddl, axis=1)
+    else:
+        n_mawb_ord_atl['real_delivery_ddl'] = pd.Series(dtype='datetime64[ns]')
+    mawb_ord_atl = n_mawb_ord_atl[n_mawb_ord_atl['pod_code'] == 'ORD'].copy()
+
+    # 处理 JFK
+    if not n_mawb_ord_jfk.empty:
+        n_mawb_ord_jfk['real_delivery_ddl'] = n_mawb_ord_jfk.apply(compute_real_ddl, axis=1)
+    else:
+        n_mawb_ord_jfk['real_delivery_ddl'] = pd.Series(dtype='datetime64[ns]')
     mawb_ord_jfk = n_mawb_ord_jfk[n_mawb_ord_jfk['pod_code'] == 'ORD'].copy()
 
     # 仓库实际最晚出库时间
