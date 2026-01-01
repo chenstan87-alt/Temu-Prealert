@@ -5,9 +5,9 @@ from analysis import get_data,get_transfer_data
 now = pd.Timestamp.now()
 
 yesterday_end = (now - pd.Timedelta(days=1)).normalize() + pd.Timedelta(hours=23, minutes=59, seconds=59)
-ten_days_ago_start = (now - pd.Timedelta(days=10)).normalize()
+two_weeks_ago_start = (now - pd.Timedelta(days=14)).normalize()
 end = yesterday_end.strftime("%Y-%m-%d %H:%M:%S")
-start = ten_days_ago_start.strftime("%Y-%m-%d %H:%M:%S")
+start = two_weeks_ago_start.strftime("%Y-%m-%d %H:%M:%S")
 
 ord_mawb, ord_container_channel, jfk_mawb, jfk_container_channel = get_data(start, end)
 ord_atl_mawb, ord_atl_container_channel, ord_jfk_mawb, ord_jfk_container_channel = get_transfer_data(start, end)
