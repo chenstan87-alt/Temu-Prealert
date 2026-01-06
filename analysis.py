@@ -423,7 +423,7 @@ def get_data(start: str, end: str) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
             base = row["customs_del"] + BDay(1)
 
         if row.get("scf_type", 0) != 0:
-            base = base + pd.Timedelta(days=row["scf_delivery_time"])
+            base = base + pd.Timedelta(hours=row["scf_delivery_time"])
         return base
 
     no_outbound_mawb["basetime_delivery_ddl"] = no_outbound_mawb.apply(compute_basetime_delivery_ddl, axis=1)
@@ -492,7 +492,7 @@ def get_data(start: str, end: str) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
             if holiday_flag:
                 base_time = row["full_release_local"] + BDay(1)
             if row.get("scf_type", 0) != 0:
-                base_time = base_time + pd.Timedelta(days=row['"scf_delivery_time"'])
+                base_time = base_time + pd.Timedelta(hours=row['"scf_delivery_time"'])
         else:
             base_time = row["basetime_delivery_ddl"]
         return base_time
