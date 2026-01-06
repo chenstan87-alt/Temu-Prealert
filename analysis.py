@@ -499,9 +499,7 @@ def get_data(start: str, end: str) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
 
     no_outbound_mawb["real_delivery_ddl"] = no_outbound_mawb.apply(compute_real_ddl, axis=1)
     no_outbound_mawb["real_outbound_ddl"] = no_outbound_mawb.apply(
-        lambda r: r["real_delivery_ddl"] if r.get("scf_type", 0) == 0 else r["real_delivery_ddl"] - pd.Timedelta(hours=float(r.get("scf_route_time", 0))),
-        axis=1
-    )
+        lambda r: r["real_delivery_ddl"] if r.get("scf_type", 0) == 0 else r["real_delivery_ddl"] - pd.Timedelta(hours=r['scf_route_time']) , axis=1)
 
     # 13) select pod_code == 'JFK' (your original selected ORD? you had pod_code=='JFK' for ord_prealert)
     ord_prealert_mawb = no_outbound_mawb[no_outbound_mawb.get("pod_code") == "ORD"].copy()
