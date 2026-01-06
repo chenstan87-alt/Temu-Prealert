@@ -408,6 +408,13 @@ def get_data(start: str, end: str) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
     )
 
     # 7) compute basetime_delivery_ddl
+    try:
+        scf_delivery_time_df = _read_data_file("scf_trip_time.xlsx")
+        scf_delivery_time_df.columns = [c.strip() for c in scf_delivery_time_df.columns]
+        scf_delivery_time_dict = scf_delivery_time_df.set_index("channel")["transfertime"].to_dict()
+    except FileNotFoundError:
+        scf_delivery_time_dict = {}
+    no_outbound_mawb["scf_delivery_time"] = no_outbound_mawb["channel_info"].map(scf_delivery_time_dict).fillna(0)
     def compute_basetime_delivery_ddl(row):
         if row["holiday"] == "N":
             base = row["customs_del"]
@@ -416,28 +423,25 @@ def get_data(start: str, end: str) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
             base = row["customs_del"] + BDay(1)
 
         if row.get("scf_type", 0) != 0:
-            base = base + pd.Timedelta(days=3)
+            base = base + pd.Timedelta(days=row["scf_delivery_time"])
         return base
 
     no_outbound_mawb["basetime_delivery_ddl"] = no_outbound_mawb.apply(compute_basetime_delivery_ddl, axis=1)
 
     # 8) scf trip time mapping from file scf_trip_time.xlsx (repo/data/)
     try:
-        scf_trip_time_df = _read_data_file("scf_trip_time.xlsx")
-        scf_trip_time_df.columns = [c.strip() for c in scf_trip_time_df.columns]
-        scf_trip_time_dict = scf_trip_time_df.set_index("channel")["trip_time"].to_dict()
+        scf_route_time_df = _read_data_file("scf_trip_time.xlsx")
+        scf_route_time_df.columns = [c.strip() for c in scf_route_time_df.columns]
+        scf_route_time_dict = scf_route_time_df.set_index("channel")["route_time"].to_dict()
     except FileNotFoundError:
-        scf_trip_time_dict = {}
+        scf_route_time_dict = {}
 
-    no_outbound_mawb["scf_trip_time"] = no_outbound_mawb["channel_info"].map(scf_trip_time_dict).fillna(0)
+    no_outbound_mawb["scf_route_time"] = no_outbound_mawb["channel_info"].map(scf_route_time_dict).fillna(0)
 
     # compute basetime_outbound_ddl
-    no_outbound_mawb["basetime_outbound_ddl"] = no_outbound_mawb.apply(
-        lambda r: r["basetime_delivery_ddl"]
-        if r.get("scf_type", 0) == 0
-        else r["basetime_delivery_ddl"] - pd.Timedelta(hours=float(r.get("scf_trip_time", 0))),
-        axis=1
-    )
+    no_outbound_mawb['basetime_outbound_ddl'] = no_outbound_mawb.apply(
+        lambda r: r["basetime_delivery_ddl"] if r['scf_type'] == 0 else r["basetime_delivery_ddl"] - pd.Timedelta(
+            hours=r['scf_route_time']), axis=1)
 
     # 9) drop rows missing full_release_local as original
     no_outbound_mawb = no_outbound_mawb.dropna(subset=["full_release_local"])
@@ -488,14 +492,14 @@ def get_data(start: str, end: str) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
             if holiday_flag:
                 base_time = row["full_release_local"] + BDay(1)
             if row.get("scf_type", 0) != 0:
-                base_time = base_time + pd.Timedelta(days=3)
+                base_time = base_time + pd.Timedelta(days=row['"scf_delivery_time"'])
         else:
             base_time = row["basetime_delivery_ddl"]
         return base_time
 
     no_outbound_mawb["real_delivery_ddl"] = no_outbound_mawb.apply(compute_real_ddl, axis=1)
     no_outbound_mawb["real_outbound_ddl"] = no_outbound_mawb.apply(
-        lambda r: r["real_delivery_ddl"] if r.get("scf_type", 0) == 0 else r["real_delivery_ddl"] - pd.Timedelta(hours=float(r.get("scf_trip_time", 0))),
+        lambda r: r["real_delivery_ddl"] if r.get("scf_type", 0) == 0 else r["real_delivery_ddl"] - pd.Timedelta(hours=float(r.get("scf_route_time", 0))),
         axis=1
     )
 
