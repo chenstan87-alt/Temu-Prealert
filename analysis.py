@@ -492,7 +492,7 @@ def get_data(start: str, end: str) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
             if holiday_flag:
                 base_time = row["full_release_local"] + BDay(1)
             if row.get("scf_type", 0) != 0:
-                base_time = base_time + pd.Timedelta(hours=row['"scf_delivery_time"'])
+                base_time = base_time + pd.Timedelta(hours=row["scf_delivery_time"])
         else:
             base_time = row["basetime_delivery_ddl"]
         return base_time
